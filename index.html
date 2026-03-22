@@ -1296,104 +1296,210 @@ function filterAttendees(type, btn) {
   });
 }
 
-// ── AI CHAT ──
-const SYSTEM_PROMPT = `You are a helpful assistant for the organiser of a bachelor party for Alex on Saturday, July 11, 2026 in Calgary and Kananaskis, Alberta, Canada. Answer concisely and conversationally. Keep responses to 2-4 sentences max unless a detailed breakdown is specifically requested.
+// ── SELF-CONTAINED CHAT ASSISTANT ──────────────────────────────────────────
+// No API needed — reads data directly from the page. Works on any host.
 
-KEY FACTS:
-- Guest of honour: Alex
-- Date: Saturday July 11, 2026 (Stampede weekend)
-- Total attendees: 18
+const KB = {
+  date: 'Saturday, July 11, 2026',
+  stampede: true,
+  attendees: { total: 18, limo: 16, steak: 18, golf: 15 },
+  costs: { limo: 98.54, steak: 138.89, golf: 290.93, full: 528.36 },
+  limoTotal: 1576.62,
+  golfTotal: 4364,
+  steakMin: 2500,
+  limoConfirmed: true,
+  golfConfirmed: true,
+  dinnerConfirmed: false,
+  schedule: [
+    { time: '6:30 AM',  event: 'Arrive & load up at the Calgary meeting point' },
+    { time: '7:00 AM',  event: 'GMC Sierra Limo departs for Kananaskis (~1 hr drive)' },
+    { time: '8:00 AM',  event: 'Arrive Mt. Lorette Golf Course, check in & warm up' },
+    { time: '9:00 AM',  event: 'Tee times begin — 4 groups: 9:00, 9:09, 9:18, 9:27 AM' },
+    { time: '1:00 PM',  event: 'Finish up at the clubhouse, load back into the limo' },
+    { time: '2:30 PM',  event: 'Limo return pickup from Kananaskis' },
+    { time: '3:30 PM',  event: 'Back at Calgary meeting point — pre-dinner drinks & snacks. Jake & Matt B join here' },
+    { time: '6:00 PM',  event: 'Uber downtown to Vintage Chophouse & Tavern' },
+    { time: '7:00 PM',  event: 'Dinner at Vintage Chophouse — Legacy private room' },
+    { time: '10:00 PM', event: 'Night out — Stampede weekend nightlife, downtown Calgary' },
+  ],
+  limo: {
+    company: 'AM PM Limo and Party Bus Calgary',
+    vehicle: 'GMC Sierra Limo',
+    passengers: 16,
+    pickup: '7:00 AM — Calgary meeting point',
+    returnPickup: '2:30 PM — Kananaskis Village',
+    total: '$1,576.62',
+    perPerson: '$98.54',
+    depositPaid: true,
+    cancellation: '24hr grace from booking. 50% charge after that. Non-refundable within 48hrs of pickup.',
+    damage: 'Minimum $500 fee for any damage.',
+    overtime: 'Billed in 1-hour increments after contracted time.',
+  },
+  golf: {
+    course: 'Mt. Lorette, Kananaskis Country Golf Club',
+    teeTimes: '9:00, 9:09, 9:18, 9:27 AM',
+    golfers: '15 paying golfers + Connor (ride-along, not paying)',
+    rideAlong: 'Connor',
+    rate: '$1,091 per tee time + 5% GST',
+    total: '$4,364 + GST',
+    perPerson: '$290.93',
+    depositPaid: true,
+    balanceDue: 'approximately May 27, 2026',
+    includes: 'GPS power carts, custom scorecards, bag tags, $25/player Golf Shop voucher ($375 total), complimentary practice facilities 45 min before tee, bottled water on carts, assigned staff coordinator, on-course contest capability (long drive, closest to pin, etc.)',
+  },
+  dinner: {
+    restaurant: 'Vintage Chophouse & Tavern',
+    room: 'Legacy private room',
+    targetTime: '7:00 PM',
+    diners: 18,
+    minimum: '$2,500 F&B minimum',
+    perPerson: '$138.89 toward minimum (actual spend likely higher)',
+    status: 'In progress — awaiting confirmation of time slot and booking forms',
+    music: 'Live jazz & blues in the Tavern on Saturday nights — Stampede weekend likely has live music',
+  },
+  perPerson: {
+    'Adam':      { limo: true,  steak: true,  golf: true,  total: 528.36 },
+    'Alex':      { limo: true,  steak: true,  golf: true,  total: 528.36 },
+    'Ric':       { limo: true,  steak: true,  golf: true,  total: 528.36 },
+    'James':     { limo: true,  steak: true,  golf: true,  total: 528.36 },
+    'Austin':    { limo: true,  steak: true,  golf: true,  total: 528.36 },
+    'Matthew':   { limo: true,  steak: true,  golf: true,  total: 528.36 },
+    'John':      { limo: true,  steak: true,  golf: true,  total: 528.36 },
+    'Justin':    { limo: true,  steak: true,  golf: true,  total: 528.36 },
+    'Conrad':    { limo: true,  steak: true,  golf: true,  total: 528.36 },
+    'Doug':      { limo: true,  steak: true,  golf: true,  total: 528.36 },
+    'Jeremy':    { limo: true,  steak: true,  golf: true,  total: 528.36 },
+    'David':     { limo: true,  steak: true,  golf: true,  total: 528.36 },
+    'Riley':     { limo: true,  steak: true,  golf: true,  total: 528.36 },
+    'Mackenzie': { limo: true,  steak: true,  golf: true,  total: 528.36 },
+    'Dane':      { limo: true,  steak: true,  golf: true,  total: 528.36 },
+    'Connor':    { limo: true,  steak: true,  golf: false, total: 237.43 },
+    'Jake':      { limo: false, steak: true,  golf: false, total: 138.89 },
+    'Matt B':    { limo: false, steak: true,  golf: false, total: 138.89 },
+  },
+  actions: [
+    { text: 'Confirm Vintage dinner time & sign booking forms', urgency: 'ASAP' },
+    { text: 'Select set dinner menu package at Vintage', urgency: 'ASAP' },
+    { text: 'Confirm live music & Legacy room proximity at Vintage', urgency: 'SOON' },
+    { text: 'Pay limo balance', urgency: 'SOON' },
+    { text: 'Pay golf balance (~$4,364 + GST)', urgency: 'May 27' },
+    { text: 'Collect dinner payments from all 18 attendees (~$138.89 each)', urgency: 'Before July 11' },
+  ],
+};
 
-SCHEDULE:
-- 6:30 AM: Arrive & load up at the Calgary meeting point
-- 7:00 AM: GMC Sierra Limo departs for Kananaskis
-- 8:00 AM: Arrive Mt. Lorette Golf Course, Kananaskis
-- 9:00-9:27 AM: 4 tee times (9:00, 9:09, 9:18, 9:27)
-- 1:00-2:15 PM: Finish at clubhouse
-- 2:30 PM: Limo return pickup from Kananaskis
-- 3:30 PM: Back at Calgary meeting point — pre-dinner drinks & snacks, Jake and Matt B join here
-- 6:00 PM: Uber downtown
-- 7:00 PM: Dinner at Vintage Chophouse & Tavern
-- 10:00 PM+: Night out
+function smartReply(q) {
+  const msg = q.toLowerCase().trim();
+  const has = (...words) => words.some(w => msg.includes(w));
 
-LIMO BOOKING (CONFIRMED, DEPOSIT PAID):
-- Company: AM PM Limo and Party Bus Calgary
-- Vehicle: GMC Sierra Limo
-- Passengers: 16
-- Pickup: 7:00 AM Calgary meeting point
-- Drop-off: Kananaskis Village
-- Return pickup: 2:30 PM from Kananaskis
-- Total cost: $1,576.62
-- Deposit paid — balance owing: on file
-- Per person: $98.54
-- Cancellation: 24hr grace from booking; 50% charge after; non-refundable within 48hrs of pickup
-- Damage fee minimum: $500
-- Overtime billed in 1-hour increments
+  // Greetings
+  if (has('hello', 'hi ', 'hey', 'sup', 'what can you') && msg.length < 30)
+    return "Hey! 👋 I know everything about Alex's July 11 bach party — the golf, limo, dinner, who owes what, the full schedule. What do you want to know?";
 
-GOLF BOOKING (CONFIRMED, DEPOSIT PAID):
-- Course: Mt. Lorette, Kananaskis Country Golf Club
-- 4 tee times, max 16 players, minimum 3 tee times
-- Tee times: 9:00, 9:09, 9:18, 9:27 AM
-- 15 paying golfers + Connor as ride-along (not golfing, not paying)
-- Rate: $1,091 per tee time + 5% GST
-- Total: $4,364 + GST
-- Per person: $290.93
-- Deposit paid — balance due approximately May 27, 2026
-- Includes: GPS power carts, custom scorecards, bag tags, $25/player Golf Shop voucher, complimentary practice facilities, bottled water, assigned staff coordinator, on-course contest capability
+  // Cost / owe questions for specific person
+  const nameMatch = Object.keys(KB.perPerson).find(n => msg.includes(n.toLowerCase()));
+  if (nameMatch && has('owe', 'cost', 'pay', 'much', 'total')) {
+    const p = KB.perPerson[nameMatch];
+    const events = [p.limo && 'Limo ($98.54)', p.steak && 'Steak ($138.89)', p.golf && 'Golf ($290.93)'].filter(Boolean).join(' + ');
+    return `${nameMatch} owes $${p.total.toFixed(2)} total — ${events}.`;
+  }
 
-DINNER (IN PROGRESS - NOT YET CONFIRMED):
-- Restaurant: Vintage Chophouse & Tavern, downtown Calgary
-- Room: Legacy private room
-- Target time: 7:00 PM
-- Diners: 18 people
-- F&B minimum: $2,500
-- Per person: $138.89 (toward minimum; actual spend likely higher)
-- Status: Awaiting confirmation of time slot and booking forms
-- Note: Live jazz/blues in Tavern on Saturday nights — Stampede weekend likely has live music
-- July 11 is Stampede weekend
+  // What everyone owes / cost breakdown
+  if (has('everyone', 'each person', 'per person', 'breakdown', 'split') && has('owe', 'cost', 'pay', 'much')) {
+    return `Most people (15 of 18) owe $528.36 — that's Limo ($98.54) + Steak ($138.89) + Golf ($290.93). Connor owes $237.43 (no golf). Jake and Matt B owe $138.89 each (steak only).`;
+  }
 
-ATTENDEES (18 total):
-- Limo (16): Adam, Alex, Ric, James, Austin, Matthew, John, Justin, Conrad, Doug, Jeremy, David, Riley, Mackenzie, Dane, Connor
-- Steak (18): All above + Jake + Matt B
-- Golf (15): Adam, Alex, Ric, James, Austin, Matthew, John, Justin, Conrad, Doug, Jeremy, David, Riley, Mackenzie, Dane (Connor is ride-along only, Jake & Matt B not golfing)
+  // General cost question
+  if (has('how much', 'total cost', 'what does it cost', 'price') && !nameMatch) {
+    return `The full day costs $528.36 per person: Limo $98.54 (÷16), Steak $138.89 (÷18), Golf $290.93 (÷15). Total across all events is about $8,440.`;
+  }
 
-COSTS PER PERSON:
-- Limo only (16 ppl): $98.54
-- Steak only (18 ppl): $138.89
-- Golf only (15 ppl): $290.93
-- Full day all three: $528.36
-- Connor: Limo + Steak only = $237.43
-- Jake: Steak only = $138.89
-- Matt B: Steak only = $138.89
+  // Schedule / when / what time
+  if (has('schedule', 'timeline', 'itinerary', 'when does', 'what time', 'plan for the day', 'day look like')) {
+    return KB.schedule.map(s => `${s.time}: ${s.event}`).join('\n');
+  }
 
-OUTSTANDING ACTIONS:
-1. ASAP: Confirm Vintage dinner time + sign booking forms
-2. ASAP: Select set dinner menu package at Vintage
-3. SOON: Confirm live music situation + Legacy room proximity at Vintage
-4. SOON: Pay limo balance (amount on file)
-5. ~May 27: Pay golf balance (~$4,364 + GST)
-6. Before July 11: Collect dinner payments from all 18 attendees`;
+  // Specific time questions
+  if (has('limo') && has('pick up', 'pickup', 'leave', 'depart', 'what time'))
+    return `The limo picks up at 7:00 AM from the Calgary meeting point and returns at 2:30 PM from Kananaskis Village.`;
+  if (has('tee time', 'golf start', 'tee off', 'golf time'))
+    return `There are 4 tee times: 9:00, 9:09, 9:18, and 9:27 AM at Mt. Lorette Golf Course, Kananaskis.`;
+  if (has('dinner') && has('time', 'when', 'start'))
+    return `Dinner at Vintage Chophouse & Tavern is targeting 7:00 PM — though the reservation isn't confirmed yet.`;
 
-async function callClaude(userMessage, history) {
-  const messages = history.map(m => ({ role: m.role, content: m.content }));
-  messages.push({ role: 'user', content: userMessage });
+  // Limo questions
+  if (has('limo', 'bus', 'transport', 'ride') && !has('golf')) {
+    if (has('cancel', 'cancellation', 'refund'))
+      return `Cancellation policy: 24hr grace from booking date. After that, 50% charge. Within 48hrs of pickup — fully non-refundable.`;
+    if (has('damage', 'spill', 'break', 'vomit', 'mess'))
+      return `Any damage to the vehicle — spills, breakage, smoking, excessive mess — carries a minimum $500 damage fee.`;
+    if (has('overtime', 'extra time', 'go over'))
+      return `If you go over the contracted time, overtime is billed in full 1-hour increments.`;
+    if (has('who', 'people', 'list', 'attending', 'on it'))
+      return `16 people are on the limo: Adam, Alex, Ric, James, Austin, Matthew, John, Justin, Conrad, Doug, Jeremy, David, Riley, Mackenzie, Dane, and Connor.`;
+    return `Limo is confirmed ✓ — GMC Sierra from AM PM Limo, 16 passengers. Picks up 7:00 AM, returns 2:30 PM. Deposit paid, balance still owing. $98.54 per person.`;
+  }
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1000,
-      system: SYSTEM_PROMPT,
-      messages
-    })
-  });
+  // Golf questions
+  if (has('golf', 'kananaskis', 'lorette', 'tee')) {
+    if (has('include', 'what\'s included', "what's included", 'come with', 'get'))
+      return `Golf includes: GPS power carts, custom scorecards, personalised bag tags, $25/player Golf Shop voucher ($375 total), complimentary practice facilities 45 min before tee, bottled water on carts, an assigned staff coordinator, and the ability to run on-course contests.`;
+    if (has('balance', 'pay', 'owe', 'due', 'when'))
+      return `The golf balance (~$4,364 + GST) is due approximately May 27, 2026 — 45 days before the event. An invoice will be sent 60 days prior.`;
+    if (has('cancel', 'minimum', 'reduce'))
+      return `Heads up — the minimum is 3 consecutive tee times. You can't reduce below that. You're currently booked for 4 tee times.`;
+    if (has('voucher', 'shop', 'prize'))
+      return `Each golfer gets a $25 Golf Shop voucher — $375 total. These can be used for shop merchandise, given as prizes for on-course contests, or turned into custom tee gifts.`;
+    if (has('who', 'people', 'list', 'attending', 'playing'))
+      return `15 people are golfing: Adam, Alex, Ric, James, Austin, Matthew, John, Justin, Conrad, Doug, Jeremy, David, Riley, Mackenzie, and Dane. Connor is coming on the limo as a ride-along but not golfing.`;
+    return `Golf is confirmed ✓ at Mt. Lorette, Kananaskis. 4 tee times (9:00–9:27 AM), 15 golfers. $290.93 per person. Deposit paid, balance due ~May 27.`;
+  }
 
-  const data = await response.json();
-  return data.content?.[0]?.text || 'Sorry, I had trouble responding. Try again!';
+  // Dinner questions
+  if (has('dinner', 'steak', 'vintage', 'restaurant', 'chophouse')) {
+    if (has('status', 'confirmed', 'booked', 'locked'))
+      return `Dinner is not yet confirmed ⏳ — still waiting on Vintage Chophouse to confirm the time slot and send booking forms for the Legacy private room.`;
+    if (has('music', 'live', 'jazz', 'band', 'stampede'))
+      return `Vintage has live jazz & blues in the Tavern on Saturday nights. July 11 is Stampede weekend so it should be a great vibe — worth confirming with them how close the Legacy room is to the music.`;
+    if (has('minimum', 'spend', 'how much'))
+      return `There's a $2,500 F&B minimum for the Legacy room, split across 18 people — about $138.89 each toward that. Actual spend per person will likely be higher once you add drinks.`;
+    if (has('room', 'private', 'legacy'))
+      return `You've been offered the Legacy private room at Vintage Chophouse — fully enclosed and highly rated for large groups. Fits your group of 18 comfortably.`;
+    if (has('who', 'people', 'list', 'attending'))
+      return `All 18 people are coming for dinner: the 16 on the limo (Adam, Alex, Ric, James, Austin, Matthew, John, Justin, Conrad, Doug, Jeremy, David, Riley, Mackenzie, Dane, Connor) plus Jake and Matt B who join at the Calgary meeting point.`;
+    return `Dinner at Vintage Chophouse & Tavern — Legacy private room, targeting 7:00 PM for 18 people. $2,500 F&B minimum ($138.89/person). Not yet confirmed, booking forms still to be signed.`;
+  }
+
+  // What's left to do / action items
+  if (has('left to do', 'still to do', 'outstanding', 'action', 'todo', 'to-do', 'still need', 'not done', "haven't done", 'pending', 'what\'s left', "what's left"))
+    return `Still to do:\n1. ASAP: Confirm Vintage dinner time & sign booking forms\n2. ASAP: Select the dinner menu package\n3. SOON: Confirm live music + Legacy room proximity at Vintage\n4. SOON: Pay limo balance\n5. May 27: Pay golf balance (~$4,364 + GST)\n6. Before July 11: Collect dinner payments from all 18 attendees`;
+
+  // Who's attending / attendees
+  if (has('who', 'attendee', 'list of people', 'guest list', 'coming', 'attending') && has('all', 'everyone', 'full list', 'people')) {
+    return `18 people total.\nLimo + Steak + Golf (15): Adam, Alex, Ric, James, Austin, Matthew, John, Justin, Conrad, Doug, Jeremy, David, Riley, Mackenzie, Dane.\nLimo + Steak only: Connor.\nSteak only: Jake, Matt B.`;
+  }
+
+  // Connor specifically
+  if (has('connor')) {
+    return `Connor is on the limo and coming for dinner but he's not golfing — he's the ride-along. He owes $237.43 (Limo $98.54 + Steak $138.89).`;
+  }
+
+  // Jake / Matt B
+  if (has('jake') || has('matt b')) {
+    const name = has('jake') ? 'Jake' : 'Matt B';
+    return `${name} is steak only — not on the limo and not golfing. They join the group at the Calgary meeting point around 3:30 PM and then Uber downtown for dinner. They owe $138.89.`;
+  }
+
+  // Stampede
+  if (has('stampede'))
+    return `July 11 falls right in the middle of Calgary Stampede — one of the biggest weekends of the year in Calgary. Downtown will be buzzing, Vintage should have live music, and the night out options will be excellent.`;
+
+  // Day overview
+  if (has('overview', 'summary', 'rundown', 'tell me about the day', 'whole day'))
+    return `Big picture: Limo picks up at 7 AM → 1 hr to Kananaskis → golf 9 AM–1 PM → limo back by 3:30 PM → drinks & snacks at the Calgary meeting point → Uber downtown at 6 PM → dinner at Vintage Chophouse 7 PM → night out. It's a Stampede Saturday so the evening should be 🔥`;
+
+  // Fallback
+  return `I'm not sure about that one — try asking about the schedule, costs, golf, limo, dinner, who's attending, or what's still left to book!`;
 }
-
-let chatHistory = [];
 
 function addMessage(role, text) {
   const container = document.getElementById('chat-messages');
@@ -1407,7 +1513,7 @@ function addMessage(role, text) {
   container.scrollTop = container.scrollHeight;
 }
 
-async function sendChat() {
+function sendChat() {
   const input = document.getElementById('chat-input');
   const msg = input.value.trim();
   if (!msg) return;
@@ -1419,17 +1525,11 @@ async function sendChat() {
   typing.style.display = 'flex';
   document.getElementById('chat-messages').scrollTop = 99999;
 
-  try {
-    const reply = await callClaude(msg, chatHistory);
+  // Small delay for natural feel
+  setTimeout(() => {
     typing.style.display = 'none';
-    addMessage('ai', reply);
-    chatHistory.push({ role: 'user', content: msg });
-    chatHistory.push({ role: 'assistant', content: reply });
-    if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
-  } catch(e) {
-    typing.style.display = 'none';
-    addMessage('ai', 'Something went wrong connecting to the AI. Check your internet connection and try again.');
-  }
+    addMessage('ai', smartReply(msg));
+  }, 400 + Math.random() * 300);
 }
 
 function sendSuggestion(btn) {
